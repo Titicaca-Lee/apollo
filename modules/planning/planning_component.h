@@ -49,24 +49,29 @@ class PlanningComponent final
  public:
   bool Init() override;
 
+//planning模块的输入
   bool Proc(const std::shared_ptr<prediction::PredictionObstacles>&
                 prediction_obstacles,
             const std::shared_ptr<canbus::Chassis>& chassis,
             const std::shared_ptr<localization::LocalizationEstimate>&
                 localization_estimate) override;
+//预测的障碍物信息(prediction_obstacles)
+//车辆底盘(chassis)信息(车辆的速度，加速度，航向角等信息)
+//车辆当前位置(localization_estimate)
 
  private:
   void CheckRerouting();
   bool CheckInput();
 
  private:
+//订阅消息
   std::shared_ptr<cyber::Reader<perception::TrafficLightDetection>>
       traffic_light_reader_;
   std::shared_ptr<cyber::Reader<routing::RoutingResponse>> routing_reader_;
   std::shared_ptr<cyber::Reader<planning::PadMessage>> pad_msg_reader_;
   std::shared_ptr<cyber::Reader<relative_map::MapMsg>> relative_map_reader_;
   std::shared_ptr<cyber::Reader<storytelling::Stories>> story_telling_reader_;
-
+//发布消息
   std::shared_ptr<cyber::Writer<ADCTrajectory>> planning_writer_;
   std::shared_ptr<cyber::Writer<routing::RoutingRequest>> rerouting_writer_;
   std::shared_ptr<cyber::Writer<PlanningLearningData>>
@@ -87,7 +92,7 @@ class PlanningComponent final
   PlanningConfig config_;
   MessageProcess message_process_;
 };
-
+//在Cyber中注册模块
 CYBER_REGISTER_COMPONENT(PlanningComponent)
 
 }  // namespace planning
