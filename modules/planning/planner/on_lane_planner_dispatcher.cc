@@ -27,6 +27,7 @@ std::unique_ptr<Planner> OnLanePlannerDispatcher::DispatchPlanner(
     const PlanningConfig& planning_config,
     const std::shared_ptr<DependencyInjector>& injector) {
   return planner_factory_.CreateObject(
+    //PUBLIC_ROAD规划器
       planning_config.standard_planning_config().planner_type(0), injector);
 }
 
