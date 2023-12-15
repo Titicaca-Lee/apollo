@@ -22,7 +22,7 @@
 
 namespace apollo {
 namespace planning {
-
+//OnLanePlannerDispatcher具体实现
 std::unique_ptr<Planner> OnLanePlannerDispatcher::DispatchPlanner(
     const PlanningConfig& planning_config,
     const std::shared_ptr<DependencyInjector>& injector) {
