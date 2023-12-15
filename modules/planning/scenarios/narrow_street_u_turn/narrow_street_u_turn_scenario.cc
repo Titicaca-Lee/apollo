@@ -17,6 +17,7 @@
 /**
  * @file
  **/
+//狭窄掉头
 #include "modules/planning/scenarios/narrow_street_u_turn/narrow_street_u_turn_scenario.h"
 
 namespace apollo {
