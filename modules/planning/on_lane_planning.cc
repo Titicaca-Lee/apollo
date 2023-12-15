@@ -13,7 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *****************************************************************************/
-
+/********************************************
+*OnLinePlanning的执行过程
+*Planner分发器根据配置，选择具体的Planner
+*初始化Frame
+*（PUBLIC_ROAD）Planner根据输入帧执行"Plan"
+**********************************************/
 #include "modules/planning/on_lane_planning.h"
 
 #include <algorithm>
@@ -246,7 +251,7 @@ void OnLanePlanning::GenerateStopTrajectory(ADCTrajectory* ptr_trajectory_pb) {
     next_point->CopyFrom(tp);
   }
 }
-
+//OnLanePlanning的主要逻辑在 RunOnce()中
 void OnLanePlanning::RunOnce(const LocalView& local_view,
                              ADCTrajectory* const ptr_trajectory_pb) {
   // when rerouting, reference line might not be updated. In this case, planning
@@ -340,6 +345,7 @@ void OnLanePlanning::RunOnce(const LocalView& local_view,
 
   injector_->ego_info()->Update(stitching_trajectory.back(), vehicle_state);
   const uint32_t frame_num = static_cast<uint32_t>(seq_num_++);
+  //初始化Frame
   status = InitFrame(frame_num, stitching_trajectory.back(), vehicle_state);
 
   if (status.ok()) {
@@ -381,7 +387,7 @@ void OnLanePlanning::RunOnce(const LocalView& local_view,
     injector_->frame_history()->Add(n, std::move(frame_));
     return;
   }
-
+//判断是否符合交通规则
   for (auto& ref_line_info : *frame_->mutable_reference_line_info()) {
     TrafficDecider traffic_decider;
     traffic_decider.Init(traffic_rule_configs_);
@@ -393,7 +399,7 @@ void OnLanePlanning::RunOnce(const LocalView& local_view,
             << " traffic decider failed";
     }
   }
-
+//执行计划
   status = Plan(start_timestamp, stitching_trajectory, ptr_trajectory_pb);
 
   for (const auto& p : ptr_trajectory_pb->trajectory_point()) {
@@ -539,7 +545,7 @@ Status OnLanePlanning::Plan(
     frame_->mutable_open_space_info()->set_debug(ptr_debug);
     frame_->mutable_open_space_info()->sync_debug_instance();
   }
-
+//调用具体的（PUBLIC_ROAD）Planner执行
   auto status = planner_->Plan(stitching_trajectory.back(), frame_.get(),
                                ptr_trajectory_pb);
 
