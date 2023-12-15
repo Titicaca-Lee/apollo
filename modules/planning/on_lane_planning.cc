@@ -107,6 +107,7 @@ OnLanePlanning::~OnLanePlanning() {
 
 std::string OnLanePlanning::Name() const { return "on_lane_planning"; }
 
+//OnLanePlanning初始化逻辑
 Status OnLanePlanning::Init(const PlanningConfig& config) {
   config_ = config;
   if (!CheckPlanningConfig(config_)) {
@@ -134,11 +135,13 @@ Status OnLanePlanning::Init(const PlanningConfig& config) {
   ACHECK(hdmap_) << "Failed to load map";
 
   // instantiate reference line provider
+  //启动参考线提供器，会另启动一个线程，执行一个定时任务，每50ms提供一次参考线
   reference_line_provider_ = std::make_unique<ReferenceLineProvider>(
       injector_->vehicle_state(), hdmap_);
   reference_line_provider_->Start();
 
   // dispatch planner
+  //为Planning分配具体的Planner
   planner_ = planner_dispatcher_->DispatchPlanner(config_, injector_);
   if (!planner_) {
     return Status(
