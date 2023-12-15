@@ -57,8 +57,10 @@ ScenarioManager::ScenarioManager(
 
 bool ScenarioManager::Init(const PlanningConfig& planning_config) {
   planning_config_.CopyFrom(planning_config);
+  //注册场景
   RegisterScenarios();
   default_scenario_type_ = ScenarioType::LANE_FOLLOW;
+  //创建场景，默认为lane_follow
   current_scenario_ = CreateScenario(default_scenario_type_);
   return true;
 }
@@ -90,7 +92,7 @@ std::unique_ptr<Scenario> ScenarioManager::CreateScenario(
           config_map_[scenario_type], &scenario_context_, injector_));
       break;
     case ScenarioType::PARK_AND_GO:
-      ptr.reset(new scenario::park_and_go::ParkAndGoScenario(
+      ptr.reset(new rio::park_and_go::ParkAndGoScenario(
           config_map_[scenario_type], &scenario_context_, injector_));
       break;
     case ScenarioType::PULL_OVER:
@@ -789,15 +791,16 @@ void ScenarioManager::Observe(const Frame& frame) {
   }
 }
 
+//更新场景
 void ScenarioManager::Update(const common::TrajectoryPoint& ego_point,
                              const Frame& frame) {
   ACHECK(!frame.reference_line_info().empty());
-
+  //保留当前帧
   Observe(frame);
-
+  //场景分发
   ScenarioDispatch(frame);
 }
-
+//通过一个有限状态机，决定当前的场景
 void ScenarioManager::ScenarioDispatch(const Frame& frame) {
   ACHECK(!frame.reference_line_info().empty());
   ScenarioType scenario_type;
