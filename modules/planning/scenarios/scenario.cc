@@ -63,16 +63,19 @@ void Scenario::Init() {
       CreateStage(*stage_config_map_[config_.stage_type(0)], injector_);
 }
 
+
 Scenario::ScenarioStatus Scenario::Process(
     const common::TrajectoryPoint& planning_init_point, Frame* frame) {
   if (current_stage_ == nullptr) {
     AWARN << "Current stage is a null pointer.";
     return STATUS_UNKNOWN;
   }
+  //如果当前阶段完成，则退出
   if (current_stage_->stage_type() == StageType::NO_STAGE) {
     scenario_status_ = STATUS_DONE;
     return scenario_status_;
   }
+  //进入下一阶段执行或者错误处理
   auto ret = current_stage_->Process(planning_init_point, frame);
   switch (ret) {
     case Stage::ERROR: {
