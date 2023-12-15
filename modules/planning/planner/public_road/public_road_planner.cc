@@ -24,7 +24,9 @@ namespace planning {
 using apollo::common::Status;
 using apollo::common::TrajectoryPoint;
 
+//注册规划器支持的场景（scenario）
 Status PublicRoadPlanner::Init(const PlanningConfig& config) {
+  //读取PublicRoad配置
   config_ = config;
   scenario_manager_.Init(config);
   return Status::OK();
