@@ -65,6 +65,7 @@ bool DpRoadGraph::FindPathTunnel(const common::TrajectoryPoint &init_point,
   waypoint_sampler_->SetDebugLogger(planning_debug_);
 
   std::vector<DpRoadGraphNode> min_cost_path;
+  //生成min_cost_path
   if (!GenerateMinCostPath(obstacles, &min_cost_path)) {
     AERROR << "Fail to generate graph!";
     return false;
@@ -80,6 +81,7 @@ bool DpRoadGraph::FindPathTunnel(const common::TrajectoryPoint &init_point,
     const double path_length = cur_node.sl_point.s() - prev_node.sl_point.s();
     double current_s = 0.0;
     const auto &curve = cur_node.min_cost_curve;
+    //对每一段curve采样，并把（s,l,dl,ddl）存入frenet_path
     while (current_s + path_resolution / 2.0 < path_length) {
       const double l = curve.Evaluate(0, current_s);
       const double dl = curve.Evaluate(1, current_s);
@@ -107,7 +109,7 @@ bool DpRoadGraph::GenerateMinCostPath(
     const std::vector<const Obstacle *> &obstacles,
     std::vector<DpRoadGraphNode> *min_cost_path) {
   ACHECK(min_cost_path != nullptr);
-
+  //撒点得到path_waypoints
   std::vector<std::vector<common::SLPoint>> path_waypoints;
   if (!waypoint_sampler_->SamplePathWaypoints(init_point_, &path_waypoints) ||
       path_waypoints.size() < 1) {
@@ -117,15 +119,18 @@ bool DpRoadGraph::GenerateMinCostPath(
   }
   const auto &vehicle_config =
       common::VehicleConfigHelper::Instance()->GetConfig();
-
+  
+  //这里的speed_data_就是计算DynamicObstacleCost时需要的heuristic_speed_data_
   TrajectoryCost trajectory_cost(
       config_, reference_line_, reference_line_info_.IsChangeLanePath(),
       obstacles, vehicle_config.vehicle_param(), speed_data_, init_sl_point_,
       reference_line_info_.AdcSlBoundary());
-
+  
+  //存储构建的graph，速度DP过程用的数据结构是vector<vector<>>，路径这里是list<list<>>
   std::list<std::list<DpRoadGraphNode>> graph_nodes;
 
   // find one point from first row
+  //从撒点得到的path_waypoints的第一纵列中，找到nearest_i
   const auto &first_row = path_waypoints.front();
   size_t nearest_i = 0;
   for (size_t i = 1; i < first_row.size(); ++i) {
@@ -139,7 +144,10 @@ bool DpRoadGraph::GenerateMinCostPath(
                                   ComparableCost());
   auto &front = graph_nodes.front().front();
   size_t total_level = path_waypoints.size();
-
+  //构建 graph_nodes
+  //两层循环:
+  //          外循环 -- 撒点的列数；
+  //          内循环 -- 列中的每个点；
   for (size_t level = 1; level < path_waypoints.size(); ++level) {
     const auto &prev_dp_nodes = graph_nodes.back();
     const auto &level_points = path_waypoints[level];
@@ -171,11 +179,12 @@ bool DpRoadGraph::GenerateMinCostPath(
 
   // find best path
   DpRoadGraphNode fake_head;
+  //找到最后一排点中，cost最小点，作为回溯起点
   for (const auto &cur_dp_node : graph_nodes.back()) {
     fake_head.UpdateCost(&cur_dp_node, cur_dp_node.min_cost_curve,
                          cur_dp_node.min_cost);
   }
-
+  //回溯，得到min_cost_path
   const auto *min_cost_node = &fake_head;
   while (min_cost_node->min_cost_prev_node) {
     min_cost_node = min_cost_node->min_cost_prev_node;
