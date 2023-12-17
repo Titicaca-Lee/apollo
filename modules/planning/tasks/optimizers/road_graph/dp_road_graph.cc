@@ -45,6 +45,7 @@ DpRoadGraph::DpRoadGraph(const DpPolyPathConfig &config,
       reference_line_(reference_line_info.reference_line()),
       speed_data_(speed_data) {}
 
+//对graph_nodes中cost最小的一组点插值，存储到path_data
 bool DpRoadGraph::FindPathTunnel(const common::TrajectoryPoint &init_point,
                                  const std::vector<const Obstacle *> &obstacles,
                                  PathData *const path_data) {
