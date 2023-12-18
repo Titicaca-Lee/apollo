@@ -220,22 +220,27 @@ void DpRoadGraph::UpdateNode(const std::shared_ptr<RoadGraphMessage> &msg) {
       init_dl = init_frenet_frame_point_.dl();
       init_ddl = init_frenet_frame_point_.ddl();
     }
+    //1D quintic polynomial curve
+    // (x0, dx0, ddx0) -- [0, param] --> (x1, dx1, ddx1)
+    // BVP问题：已知两端点的 值、一阶导、二阶导，即可求得5次多项式
+    // 只有level==1时，用车辆的位姿信息设定 dl、ddl,其他情况都是0，因为每个level之间的Δs还是挺大的，近似为0问题也不大
     QuinticPolynomialCurve1d curve(prev_sl_point.l(), init_dl, init_ddl,
                                    cur_point.l(), 0.0, 0.0,
                                    cur_point.s() - prev_sl_point.s());
 
-    if (!IsValidCurve(curve)) {
+    if (!IsValidCurve(curve)) { //剪枝，单位s内，变化太大即为非法
       continue;
     }
     const auto cost =
         msg->trajectory_cost->Calculate(curve, prev_sl_point.s(), cur_point.s(),
                                         msg->level, msg->total_level) +
         prev_dp_node.min_cost;
-
+    //如果与最新的prev_dp_node之间的cost更小，会更新连接关系
     msg->cur_node->UpdateCost(&prev_dp_node, curve, cost);
   }
 
   // try to connect the current point with the first point directly
+  //有变道 且level > 2，尝试与起点连接
   if (reference_line_info_.IsChangeLanePath() && msg->level >= 2) {
     const double init_dl = init_frenet_frame_point_.dl();
     const double init_ddl = init_frenet_frame_point_.ddl();
