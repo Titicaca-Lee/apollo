@@ -112,27 +112,27 @@ ComparableCost TrajectoryCost::CalculatePathCost(
   for (double curve_s = 0.0; curve_s < (end_s - start_s);
        curve_s += config_.path_resolution()) {
     const double l = curve.Evaluate(0, curve_s);
-
+    //0阶导的cost
     path_cost += l * l * config_.path_l_cost() * quasi_softmax(std::fabs(l));
-
+    //一阶导的cost
     const double dl = std::fabs(curve.Evaluate(1, curve_s));
     if (IsOffRoad(curve_s + start_s, l, dl, is_change_lane_path_)) {
       cost.cost_items[ComparableCost::OUT_OF_BOUNDARY] = true;
     }
 
     path_cost += dl * dl * config_.path_dl_cost();
-
+    //二阶导的cost
     const double ddl = std::fabs(curve.Evaluate(2, curve_s));
     path_cost += ddl * ddl * config_.path_ddl_cost();
   }
   path_cost *= config_.path_resolution();
-
+  //最后一层，距离车道中心线的cost
   if (curr_level == total_level) {
     const double end_l = curve.Evaluate(0, end_s - start_s);
     path_cost +=
         std::sqrt(end_l - init_sl_point_.l() / 2.0) * config_.path_end_l_cost();
   }
-  cost.smoothness_cost = path_cost;
+  cost.smoothness_cost = path_cost;//上面计算的这些cost都是“平滑指标”，即smoothness_cost
   return cost;
 }
 
@@ -177,11 +177,13 @@ bool TrajectoryCost::IsOffRoad(const double ref_s, const double l,
 
   return false;
 }
-
+//从ego的start_s到end_s计算 所有静态障碍物的cost
+//其实就是以某一分辨率沿着curve走一遍，在离static obstacles比较近时，算一个cost，其他的都对cost没贡献
 ComparableCost TrajectoryCost::CalculateStaticObstacleCost(
     const QuinticPolynomialCurve1d &curve, const double start_s,
     const double end_s) {
   ComparableCost obstacle_cost;
+  //从ego的start_s到end_s计算 所有静态障碍物的cost
   for (double curr_s = start_s; curr_s <= end_s;
        curr_s += config_.path_resolution()) {
     const double curr_l = curve.Evaluate(0, curr_s - start_s);
@@ -189,7 +191,7 @@ ComparableCost TrajectoryCost::CalculateStaticObstacleCost(
       obstacle_cost += GetCostFromObsSL(curr_s, curr_l, obs_sl_boundary);
     }
   }
-  obstacle_cost.safety_cost *= config_.path_resolution();
+  obstacle_cost.safety_cost *= config_.path_resolution();//计算的是“安全指标”，safety_cost
   return obstacle_cost;
 }
 
@@ -202,9 +204,14 @@ ComparableCost TrajectoryCost::CalculateDynamicObstacleCost(
   }
 
   double time_stamp = 0.0;
+  // for形成的两层循环
+  // 外循环，依据time_stamp，拿到自车的信息，即ego_box
+  // 内循环，ego_box依次与所有的 dynamic_obstacle_boxes_ 计算cost
   for (size_t index = 0; index < num_of_time_stamps_;
        ++index, time_stamp += config_.eval_time_interval()) {
     common::SpeedPoint speed_point;
+    // 从 SpeedData容器中，依据 time_stamp 返回一个speed_point，用到了线性插值
+    // 见 apollo-master\modules\planning\common\speed\speed_data.cc\ SpeedData::EvaluateByTime()
     heuristic_speed_data_.EvaluateByTime(time_stamp, &speed_point);
     double ref_s = speed_point.s() + init_sl_point_.s();
     if (ref_s < start_s) {
@@ -216,21 +223,24 @@ ComparableCost TrajectoryCost::CalculateDynamicObstacleCost(
 
     const double s = ref_s - start_s;  // s on spline curve
     const double l = curve.Evaluate(0, s);
-    const double dl = curve.Evaluate(1, s);
+    const double dl = curve.Evaluate(1, s);//对应于航向角yaw
 
     const common::SLPoint sl = common::util::PointFactory::ToSLPoint(ref_s, l);
     const Box2d ego_box = GetBoxFromSLPoint(sl, dl);
+    // 当前时刻下，与所有动态dynamic_obstacle的cost
     for (const auto &obstacle_trajectory : dynamic_obstacle_boxes_) {
       obstacle_cost +=
           GetCostBetweenObsBoxes(ego_box, obstacle_trajectory.at(index));
     }
   }
   static constexpr double kDynamicObsWeight = 1e-6;
+   // 也是安全性cost，即safety_cost
   obstacle_cost.safety_cost *=
       (config_.eval_time_interval() * kDynamicObsWeight);
   return obstacle_cost;
 }
 
+//具体事务cost计算交给GetCostFromObsSL()来完成
 ComparableCost TrajectoryCost::GetCostFromObsSL(
     const double adc_s, const double adc_l, const SLBoundary &obs_sl_boundary) {
   const auto &vehicle_param =
@@ -274,6 +284,9 @@ ComparableCost TrajectoryCost::GetCostFromObsSL(
   */
 
   static constexpr double kSafeDistance = 0.6;
+  //距离小于0.6m才计算cost
+  //用Sigmoid函数计算距离近的静态障碍cost
+  这里没用常见的距离平方倒数作为惩罚项，而是用Sigmoid函数，这样可以避免距离很小时cost徒增，其他惩罚项都被淹没了
   if (delta_l < kSafeDistance) {
     obstacle_cost.safety_cost +=
         config_.obstacle_collision_cost() *
@@ -284,6 +297,7 @@ ComparableCost TrajectoryCost::GetCostFromObsSL(
 }
 
 // Simple version: calculate obstacle cost by distance
+//根据预测出来的动态障碍物的轨迹，也是用离散的方式，一小节一小节地判断，当时间接近、位置接近时，借助GetCostBetweenObsBoxes计算cost()
 ComparableCost TrajectoryCost::GetCostBetweenObsBoxes(
     const Box2d &ego_box, const Box2d &obstacle_box) const {
   ComparableCost obstacle_cost;
